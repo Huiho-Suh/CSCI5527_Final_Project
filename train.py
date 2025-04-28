@@ -26,8 +26,8 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 # Mixed Pricision Training
-from torch.amp import autocast, GradScaler
-# from torch.cuda.amp import GradScaler
+from torch.amp import autocast
+from torch.cuda.amp import GradScaler
 
 from models.VAE import TransformerVAE
 from data_loader import RobotDataset
@@ -36,7 +36,7 @@ from skimage.metrics import peak_signal_noise_ratio, normalized_root_mse, struct
 from torch_fidelity import calculate_metrics
 
 from datetime import datetime
-from utils import set_seed, load_data, set_distributed_training, initialize_model_ddp, plot_history, save_examples, frechet_distance, get_beta_cyclical
+from utils import set_seed, load_data, set_distributed_training, initialize_model_ddp, plot_history, save_examples, frechet_distance, get_beta_cyclical, inception_preprocess
 from tqdm import tqdm
 
 from torchvision.models import inception_v3
@@ -228,7 +228,7 @@ def eval(model, model_config, val_dataloader, ddp_config):
     # Load best checkpoint
     if local_rank == 0:
         best_ckpt = torch.load(os.path.join(ckpt_dir, 'best_ckpt.pth'))
-        model.module.load_state_dict(best_ckpt['model_state_dict'])
+        model.module.load_state_dict(best_ckpt['model_state_dict'], strict=False)
         
     # print(torch.cuda.memory_summary(device))
     model.eval()
@@ -270,8 +270,10 @@ def eval(model, model_config, val_dataloader, ddp_config):
             ##################
             
             # Collect FID features
-            real_feat = inception(batch).detach()
-            fake_feat = inception(recon_batch).detach()
+            batch_preprocessed = inception_preprocess(batch)
+            recon_preprocessed = inception_preprocess(recon_batch)
+            real_feat = inception(batch_preprocessed).detach()
+            fake_feat = inception(recon_preprocessed).detach()
             
             # real_features.append(real_feat)
             # fake_features.append(fake_feat)
@@ -284,7 +286,7 @@ def eval(model, model_config, val_dataloader, ddp_config):
             for o, r in zip(batch_np, recon_np):
                 psnr_list.append(peak_signal_noise_ratio(o, r, data_range=1.0))
                 nrmse_list.append(normalized_root_mse(o, r))
-                ssim_list.append(structural_similarity(o, r, multichannel=True, data_range=1.0, channel_axis=0)) # (C, H, W)
+                ssim_list.append(structural_similarity(o, r, multichannel=False, data_range=1.0, channel_axis=0)) # (C, H, W)
                 
             # Sum up the metrics from all GPUs     
             total_psnr += torch.tensor(psnr_list, device=device).sum()
@@ -366,8 +368,6 @@ def eval(model, model_config, val_dataloader, ddp_config):
     dist.barrier() 
     # End distributed processing
     dist.destroy_process_group()
-    
-    return metrics
     
 def get_config(args):
     

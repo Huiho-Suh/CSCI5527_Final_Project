@@ -1,5 +1,8 @@
+torch 2.6.0+cu118
+
 ```
 bash
+
 torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/test \

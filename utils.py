@@ -9,6 +9,8 @@ from models.VAE import TransformerVAE
 import os
 from scipy.linalg import sqrtm
 from matplotlib import pyplot as plt
+
+import torch._dynamo as dynamo
 # Distributed training
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -159,8 +161,7 @@ def initialize_model_ddp(model_config, ddp_config):
     model = TransformerVAE(img_size=image_size, patch_size=16, latent_dim=128, in_channels=in_channels).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     model = DDP(model, device_ids=[ddp_config["local_rank"]], output_device=ddp_config["local_rank"]) # DDP Wrapping
-    model = torch.compile(model) # Torch Compile Wrapping
-    
+    model = torch.compile(model, backend='eager') # Torch Compile Wrapping
     scaler = GradScaler() # Automatic Mixed Precision Scaler
     
     return model, optimizer, scaler
@@ -193,10 +194,10 @@ def save_examples(orig_batch, recon_batch, save_dir):
     
     fig, axes = plt.subplots(1, 2, figsize=(10, 5), constrained_layout=True)
     
-    axes[0].imshow(orig)
+    axes[0].imshow(orig, cmap='gray')
     axes[0].set_title('Original Image')
     axes[0].axis('off')
-    axes[1].imshow(recon)
+    axes[1].imshow(recon, cmap='gray')
     axes[1].set_title('Reconstructed Image')
     axes[1].axis('off')
     
@@ -241,3 +242,21 @@ def get_beta_cyclical(iteration, cycle_length, min_beta, max_beta):
     beta = min_beta + (max_beta - min_beta) * np.maximum(0, (1 - x))
     
     return beta
+
+def inception_preprocess(image_batch):
+    """
+    Preprocess images for Inception model.
+    Args:
+        images: Images to preprocess. (Batch, C, H, W)
+    Returns:
+        preprocessed_images: Preprocessed images. (Batch, C, H, W)
+    """
+    
+    # Resize and normalize the images
+    
+    preprocess = v2.Compose([v2.Resize((299,299)),
+                             v2.Grayscale(num_output_channels=3),
+                             v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]) # Use ImageNet mean and std so the activations land in the same range as Inception-v3 was trained on
+    
+    
+    return preprocess(image_batch)
