@@ -1,6 +1,6 @@
 import torch
 import torchvision.transforms.v2 as v2
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import numpy as np
 from datasets import load_dataset, Image
 from data_loader import RobotDataset
@@ -10,7 +10,6 @@ import os
 from scipy.linalg import sqrtm
 from matplotlib import pyplot as plt
 
-import torch._dynamo as dynamo
 # Distributed training
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -161,23 +160,27 @@ def initialize_model_ddp(model_config, ddp_config):
     model = TransformerVAE(img_size=image_size, patch_size=16, latent_dim=128, in_channels=in_channels).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     model = DDP(model, device_ids=[ddp_config["local_rank"]], output_device=ddp_config["local_rank"]) # DDP Wrapping
-    model = torch.compile(model, backend='eager') # Torch Compile Wrapping
+    model = torch.compile(model) # Torch Compile Wrapping
     scaler = GradScaler() # Automatic Mixed Precision Scaler
     
     return model, optimizer, scaler
 
-def plot_history(train_values, val_values, num_epochs, ckpt_dir, seed):
-    # save training curves
-    plot_path = os.path.join(ckpt_dir, f'train_val_loss_seed_{seed}.png')
-    plt.figure()
-    plt.plot(np.linspace(0, num_epochs-1, len(train_values)), train_values, label='train')
-    plt.plot(np.linspace(0, num_epochs-1, len(val_values)), val_values, label='validation')
-    # plt.ylim([-0.1, 1])
-    plt.tight_layout()
-    plt.legend()
-    plt.title("Loss")
-    plt.savefig(plot_path)
-    print(f'Saved plots to {ckpt_dir}')
+def plot_history(train_history_dict, val_history_dict, num_epochs, ckpt_dir, seed):
+    
+    for k in train_history_dict.keys():
+        train_values = train_history_dict[k]
+        val_values = val_history_dict[k]
+        # save training curves
+        plot_path = os.path.join(ckpt_dir, f'{k}_seed_{seed}.png')
+        plt.figure()
+        plt.plot(np.linspace(0, num_epochs-1, len(train_values)), train_values, label='train')
+        plt.plot(np.linspace(0, num_epochs-1, len(val_values)), val_values, label='validation')
+        # plt.ylim([-0.1, 1])
+        plt.tight_layout()
+        plt.legend()
+        plt.title(f"k")
+        plt.savefig(plot_path)
+        print(f'Saved plots to {ckpt_dir}')
     
 def save_examples(orig_batch, recon_batch, save_dir):
     
@@ -256,7 +259,10 @@ def inception_preprocess(image_batch):
     
     preprocess = v2.Compose([v2.Resize((299,299)),
                              v2.Grayscale(num_output_channels=3),
-                             v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]) # Use ImageNet mean and std so the activations land in the same range as Inception-v3 was trained on
+                             # Use ImageNet mean and std so the activations 
+                             # land in the same range as Inception-v3 was trained on
+                             v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                             ]) 
     
     
     return preprocess(image_batch)

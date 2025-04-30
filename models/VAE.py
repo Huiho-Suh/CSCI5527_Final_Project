@@ -1,23 +1,12 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision import transforms
 from torchvision.utils import save_image
-from torch.utils.data import DataLoader
-import os
-from PIL import Image
-import numpy as np
 from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
-import random
 import torchvision
-from torchvision import datasets
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
 import matplotlib.pyplot as plt
-import os
-import math
 
 torch.set_float32_matmul_precision('high')
 
@@ -40,8 +29,7 @@ class PatchEmbedding(nn.Module):
         return x
     
 class TransformerVAE(nn.Module):
-    def __init__(self, img_size=(480, 640), img_scale_factor=0.5, patch_size=16, in_channels=3, latent_dim=128, num_layers=6, num_heads=8, 
-                 embed_dim=768, dim_feedforward=2048):
+    def __init__(self, img_size=(480, 640), img_scale_factor=0.5, patch_size=16, in_channels=3, latent_dim=128, num_layers=6, num_heads=8, embed_dim=768, dim_feedforward=2048):
         super().__init__()
         
         # Parameters
@@ -113,11 +101,13 @@ class TransformerVAE(nn.Module):
         # 1) BCE
         logits = x_recon.view(B, -1)
         target = x.view(B, -1).float()
-        bce_loss = self.BCE(logits, target)
+        bce = self.BCE(logits, target)
         # 2) KL
-        kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-        # 3) 배치당 평균 혹은 sum
-        return (bce_loss + beta * kl_loss) / B
+        kl = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+        # 3) average sum
+        loss = bce + beta * kl
+        
+        return bce, kl, loss
     
     def scaled_image_size(self, img_size, img_scale_factor, patch_size):
         new_size = (int(img_size[0] * img_scale_factor),

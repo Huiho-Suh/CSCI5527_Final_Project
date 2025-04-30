@@ -17,8 +17,7 @@ from torch.amp import autocast
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, normalized_root_mse, structural_similarity
 
-from utils import set_seed, load_data, set_distributed_training, initialize_model_ddp, plot_history, save_examples
-from utils import frechet_distance, get_beta_cyclical, inception_preprocess
+from utils import set_seed, load_data, set_distributed_training, initialize_model_ddp, plot_history, save_examples, frechet_distance, get_beta_cyclical, inception_preprocess
 from tqdm import tqdm
 
 from torchvision.models import inception_v3
@@ -81,8 +80,8 @@ def train(model, model_config, optimizer,
     best_loss = float('inf')
     best_ckpt = None
     
-    train_history = []
-    validation_history = []
+    train_loss_history = []
+    val_loss_history = []
     
     if local_rank == 0:
         epoch_iter = tqdm(range(num_epochs), desc="Training")
@@ -94,17 +93,18 @@ def train(model, model_config, optimizer,
         
         val_dataloader.sampler.set_epoch(epoch) # Set epoch for distributed sampler
         # Validation
-        total_loss = torch.zeros(3, device=device)
+        total_loss = torch.tensor(0.0, device=device)
         total_count = torch.tensor(0, device=device)
         
         with torch.inference_mode():
             model.eval()
+            
             for batch in val_dataloader:
                 batch = batch.to(device, non_blocking=True)
                 recon_batch, mu, log_var = model(batch)
-                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var)
-            
-                total_loss += torch.tensor((bce.detach(), kl.detach(), loss.detach()), device=device)
+                loss = model.module.loss_function(batch, recon_batch, mu, log_var)
+                
+                total_loss += loss.detach()
                 total_count += batch.size(0)
                 
                 del recon_batch, mu, log_var
@@ -117,21 +117,21 @@ def train(model, model_config, optimizer,
         
         if local_rank == 0:
             
-            # avg_loss = total_loss.item() / total_count.item()
-            avg_loss = total_loss / total_count
-            validation_history.append({'bce_loss': avg_loss[0].item(), 'kl_loss': avg_loss[1].item(), 'total_loss': avg_loss[2].item()})
-            # print(f"Validation Loss: {avg_loss[2].item():.4f}")
+            avg_loss = total_loss.item() / total_count.item()
+            val_loss_history.append(avg_loss)
             
-            if loss < best_loss:
-                best_loss = loss
+            if avg_loss < best_loss:
+                best_loss = avg_loss
                 ckpt = {
                     'epoch': epoch + 1,
                     'model_state_dict': model.module.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scaler_state_dict': scaler.state_dict(),
-                    'best_loss': avg_loss[2],
+                    'best_loss': avg_loss,
                 }
                 best_ckpt = ckpt
+                min_val_loss = avg_loss
+                best_epoch = epoch + 1
                 # print('best epoch', best_epoch)
                 torch.save(best_ckpt, os.path.join(ckpt_dir, 'best_ckpt.pth'))
                 # print(f'Best ckpt, val loss {min_val_loss:.6f} @ epoch{best_epoch}')
@@ -140,7 +140,7 @@ def train(model, model_config, optimizer,
         # Training
         model.train()
         train_dataloader.sampler.set_epoch(epoch) # Set epoch for distributed sampler
-        total_loss = torch.zeros(3, device=device)
+        total_loss = torch.tensor(0.0, device=device)
         total_count = torch.tensor(0, device=device)
         
         # Cyclical KL Divergence Annealing
@@ -155,14 +155,14 @@ def train(model, model_config, optimizer,
              # AMP Autocast
             with autocast(device_type='cuda', enabled=True):
                 recon_batch, mu, log_var = model(batch)
-                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var)
+                loss = model.module.loss_function(batch, recon_batch, mu, log_var, beta=beta)
                 
             # Scaled backward + step
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             
-            total_loss += torch.tensor((bce.detach(), kl.detach(), loss.detach()), device=device)
+            total_loss += loss.detach()
             total_count += batch.size(0)
             iteration+=1
             
@@ -174,8 +174,8 @@ def train(model, model_config, optimizer,
             
         if local_rank == 0:
             
-            avg_loss = total_loss / total_count
-            train_history.append({'bce_loss': avg_loss[0].item(), 'kl_loss': avg_loss[1].item(), 'total_loss': avg_loss[2].item()})
+            avg_loss = total_loss.item() / total_count.item()
+            train_loss_history.append(avg_loss)
             
             if (epoch + 1) % 20 == 0:
                 ckpt = {
@@ -183,12 +183,12 @@ def train(model, model_config, optimizer,
                     'model_state_dict': model.module.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scaler_state_dict': scaler.state_dict(),
-                    'loss': avg_loss[2],
+                    'loss': avg_loss,
                 }
                 path = os.path.join(ckpt_dir, f'ckpt_epoch_{epoch+1}.pth')
                 torch.save(ckpt, path)
                 plot_history(
-                    train_history, validation_history, num_epochs,
+                    train_loss_history, val_loss_history, num_epochs,
                     ckpt_dir, seed)
                 print(f"[Rank 0] Saved checkpoint: {path} @ epoch {epoch + 1}")
             
@@ -369,7 +369,7 @@ def get_config(args):
         'num_heads': 8,
         'num_layers': 6,
         'latent_dim': 128,
-        'patch_size': 8,
+        'patch_size': 16,
         'img_size': (480, 640),
         'in_channels': in_channels,
         
