@@ -18,7 +18,7 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, normalized_root_mse, structural_similarity
 
 from utils import set_seed, load_data, set_distributed_training, initialize_model_ddp, plot_history, save_examples
-from utils import frechet_distance, get_beta_cyclical, inception_preprocess
+from utils import frechet_distance, get_beta_cyclical, inception_preprocess, compute_dict
 from tqdm import tqdm
 
 from torchvision.models import inception_v3
@@ -187,8 +187,10 @@ def train(model, model_config, optimizer,
                 }
                 path = os.path.join(ckpt_dir, f'ckpt_epoch_{epoch+1}.pth')
                 torch.save(ckpt, path)
+                train_history_dict = compute_dict(train_history)
+                validation_history_dict = compute_dict(validation_history)
                 plot_history(
-                    train_history, validation_history, num_epochs,
+                    train_history_dict, validation_history_dict, num_epochs,
                     ckpt_dir, seed)
                 print(f"[Rank 0] Saved checkpoint: {path} @ epoch {epoch + 1}")
             

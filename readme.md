@@ -13,10 +13,9 @@ For training, run the following script with appropriate arguments. \
 For evaluating, add `--eval` to the existing command.
 ```
 
-torchrun --nproc_per_node=2 \ 
-    train.py \
+torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
-    --ckpt_dir ckpt/{name_of_experiment} \
+    --ckpt_dir ckpt/insertion_0.5_100 \
     --num_epochs 1  \
     --batch_size 64 \
     --img_scale_factor 0.5 \
@@ -31,7 +30,7 @@ torchrun --nproc_per_node=2 \
 -- CUDA_VISIBLE_DEVICES=1 \
 torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
-    --ckpt_dir ckpt/test \
+    --ckpt_dir ckpt/insertion_0.5_100 \
     --num_epochs 1  \
     --batch_size 64 \
     --img_scale_factor 0.5 \
@@ -47,7 +46,7 @@ torchrun --nproc_per_node=2 train.py \
 ### Options
 1. nproc_per_node: Number of GPUs available 
 2. task_name: Name of the robot task. For this project, aloha_sim_insertion_human_image
-3. ckpt_dir: Directory of the ckpt. This will be automatically created during training, and use that directory when evaluating.
+3. ckpt_dir: Directory of the ckpt.
 4. img_scale_factor: Scaling factor for both H & W.
 
 

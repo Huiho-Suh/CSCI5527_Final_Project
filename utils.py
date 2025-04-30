@@ -266,3 +266,18 @@ def inception_preprocess(image_batch):
     
     
     return preprocess(image_batch)
+
+def compute_dict(history):
+    """
+    Compute the mean and std of the history dictionary.
+    Args:
+        history: The history dictionary. (list of dicts)
+    Returns:
+        history_dict: dictonary of list
+    """
+    
+    history_dict = {k: None for k in history[0].keys()}
+    for k in history[0].keys():
+        history_dict[k] = [history[i][k] for i in range(len(history))]
+        
+    return history_dict
