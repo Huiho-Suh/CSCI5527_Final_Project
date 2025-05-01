@@ -374,6 +374,7 @@ def get_config(args):
         'patch_size': 8,
         'img_size': (480, 640),
         'in_channels': in_channels,
+        'model_type': args['model_type']# 'CNN' or 'Transformer'
         
     }
     
@@ -392,10 +393,11 @@ if __name__ == "__main__":
     parser.add_argument('--task_name', action='store', type=str, help='task_name', required=True)
     parser.add_argument('--ckpt_dir', action='store', type=str, help='ckpt_dir', required=True)
     
+    parser.add_argument('--model_type', action='store', type=str, help='model_type', required=True)
     parser.add_argument('--num_epochs', action='store', type=int, help='num_epochs', required=True)
     parser.add_argument('--batch_size', action='store', type=int, help='batch_size', required=True)
     
-    parser.add_argument('--img_scale_factor', action='store', type=float, help='img_scale_factor', required=True)
+    parser.add_argument('--img_scale_factor', action='store', type=int, help='img_scale_factor', required=True)
     parser.add_argument('--embed_dim', action='store', type=int, help='embed_dim', required=True)
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=True)
     parser.add_argument('--weight_decay', action='store', type=float, help='weight_decay', required=True)

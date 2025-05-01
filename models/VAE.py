@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torchvision
 from torchvision import transforms
 import matplotlib.pyplot as plt
-
+import math
 torch.set_float32_matmul_precision('high')
 
 
@@ -29,14 +29,14 @@ class PatchEmbedding(nn.Module):
         return x
     
 class TransformerVAE(nn.Module):
-    def __init__(self, img_size=(480, 640), img_scale_factor=0.5, patch_size=16, in_channels=3, latent_dim=128, num_layers=6, num_heads=8, embed_dim=768, dim_feedforward=2048):
+    def __init__(self, img_size=(480, 640), img_scale_factor=2, patch_size=16, in_channels=3, latent_dim=128, num_layers=6, num_heads=8, embed_dim=768, dim_feedforward=2048):
         super().__init__()
         
         # Parameters
         self.img_size =img_size
         self.latent_dim = latent_dim
         self.embed_dim = embed_dim
-        self.img_scale_factor = img_scale_factor
+        self.img_scale_factor = 1/img_scale_factor
         self.in_channels = in_channels
         
         # The model accepts scaled images and outputs original size images
@@ -117,49 +117,104 @@ class TransformerVAE(nn.Module):
         
         return new_size
     
-    def generate(self, z):
-        with torch.no_grad():
-            x_recon = self.decode(z)
-        return x_recon
+import math
+import torch.nn.functional as F
+
+class CNNVAE(nn.Module):
+    def __init__(
+        self,
+        in_channels=1,
+        hidden_channels=64,
+        latent_channels=128,
+        scale=2,
+        num_feat_blocks=3  # Number of feature extraction blocks for depth control
+    ):
+        super().__init__()
+        # Ensure scale is a power of two (2, 4, 8, ...)
+        assert scale & (scale - 1) == 0 and scale > 0, "scale must be a power of two."
+        n_scales = int(math.log2(scale))
+
+        # ---- Encoder Feature Extraction: stride=1 conv blocks (maintain spatial resolution) ----
+        enc_feat = []
+        for i in range(num_feat_blocks):
+            enc_feat.append(nn.Conv2d(
+                in_channels if i == 0 else hidden_channels,
+                hidden_channels,
+                kernel_size=3, stride=1, padding=1
+            ))
+            enc_feat.append(nn.ReLU(inplace=True))
+        self.enc_feat = nn.Sequential(*enc_feat)
+
+        # ---- Encoder Downsampling: stride=2 conv blocks (reduce spatial resolution) × n_scales ----
+        enc_down = []
+        for _ in range(n_scales):
+            enc_down.append(nn.Conv2d(
+                hidden_channels, hidden_channels,
+                kernel_size=4, stride=2, padding=1
+            ))
+            enc_down.append(nn.ReLU(inplace=True))
+        self.enc_down = nn.Sequential(*enc_down)
+
+        # ---- Latent Projections: project to mean and log-variance ----
+        self.conv_mu     = nn.Conv2d(hidden_channels, latent_channels, kernel_size=1)
+        self.conv_logvar = nn.Conv2d(hidden_channels, latent_channels, kernel_size=1)
+
+        # ---- Decoder Preparation: map latent vector back to feature space ----
+        self.dec_prep = nn.Conv2d(latent_channels, hidden_channels, kernel_size=3, padding=1)
+
+        # ---- Decoder Upsampling: PixelShuffle blocks × n_scales (increase spatial resolution) ----
+        dec_up = []
+        for _ in range(n_scales):
+            dec_up.append(nn.Conv2d(
+                hidden_channels, hidden_channels * 4,
+                kernel_size=3, padding=1
+            ))
+            dec_up.append(nn.PixelShuffle(2))
+            dec_up.append(nn.ReLU(inplace=True))
+        self.dec_up = nn.Sequential(*dec_up)
+
+        # ---- Decoder Feature Refinement: stride=1 conv blocks (maintain spatial resolution) ----
+        dec_feat = []
+        for _ in range(num_feat_blocks):
+            dec_feat.append(nn.Conv2d(
+                hidden_channels, hidden_channels,
+                kernel_size=3, stride=1, padding=1
+            ))
+            dec_feat.append(nn.ReLU(inplace=True))
+        self.dec_feat = nn.Sequential(*dec_feat)
+
+        # ---- Final Output Convolution: generate high-resolution image ----
+        self.final = nn.Conv2d(hidden_channels, in_channels, kernel_size=3, padding=1)
+
+    def reparameterize(self, mu, logvar):
+        # Apply the reparameterization trick to sample from N(mu, sigma^2)
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def forward(self, x_lr):
+        # 1) Encoder: extract features and downsample
+        h = self.enc_feat(x_lr)    # [B, hidden_channels, H, W]
+        h = self.enc_down(h)       # [B, hidden_channels, H/scale, W/scale]
+
+        # 2) Compute latent mean and log-variance, then sample
+        mu     = self.conv_mu(h)   # [B, latent_channels, H/scale, W/scale]
+        logvar = self.conv_logvar(h)
+        z      = self.reparameterize(mu, logvar)
+
+        # 3) Decoder: prepare features, upsample, then refine
+        d = self.dec_prep(z)       # [B, hidden_channels, H/scale, W/scale]
+        d = self.dec_up(d)         # [B, hidden_channels, H, W]
+        d = self.dec_feat(d)       # [B, hidden_channels, H, W]
+        x_hr = self.final(d)       # [B, in_channels, H*scale, W*scale]
+
+        return x_hr, mu, logvar
     
-    def save_model(self, path):
-        torch.save(self.state_dict(), path)
-        
-    def load_model(self, path):
-        self.load_state_dict(torch.load(path))
-        self.eval()
-        
-    def sample(self, num_samples):
-        z = torch.randn(num_samples, self.latent_dim).to(next(self.parameters()).device)
-        samples = self.generate(z)
-        return samples
-    
-    def visualize_samples(self, samples, save_path):
-        
-        grid = torchvision.utils.make_grid(samples, nrow=8, normalize=True)
-        save_image(grid, save_path)
-        plt.imshow(grid.permute(1, 2, 0).cpu())
-        plt.axis('off')
-        plt.show()
-        
-    def visualize_reconstructions(self, original, reconstructed, save_path):
-        grid = torchvision.utils.make_grid(torch.cat([original, reconstructed], dim=0), nrow=8, normalize=True)
-        save_image(grid, save_path)
-        plt.imshow(grid.permute(1, 2, 0).cpu())
-        plt.axis('off')
-        plt.show()
-        
-    def calculate_mse(self, original, reconstructed):
-        original = original.view(original.size(0), -1)
-        reconstructed = reconstructed.view(reconstructed.size(0), -1)
-        mse = mean_squared_error(original.cpu().numpy(), reconstructed.cpu().numpy())
-        return mse
-    
-    def plot_mse_distribution(self, mse_values, save_path):
-        plt.hist(mse_values, bins=50, density=True)
-        plt.xlabel('Mean Squared Error')
-        plt.ylabel('Density')
-        plt.title('MSE Distribution')
-        plt.savefig(save_path)
-        plt.show()
-     
+    def loss_function(self, x, x_recon, mu, logvar, beta=1.0):
+        # 1) Reconstruction loss (MSE)
+        recon_loss = F.mse_loss(x_recon, x)
+        # 2) KL divergence
+        kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        # 3) Total loss
+        total_loss = recon_loss + beta * kl_loss
+        return recon_loss, kl_loss, total_loss

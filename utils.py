@@ -5,7 +5,7 @@ import numpy as np
 from datasets import load_dataset, Image
 from data_loader import RobotDataset
 from torch.utils.data import DataLoader, DistributedSampler
-from models.VAE import TransformerVAE
+from models.VAE import TransformerVAE, CNNVAE
 import os
 from scipy.linalg import sqrtm
 from matplotlib import pyplot as plt
@@ -154,10 +154,14 @@ def initialize_model_ddp(model_config, ddp_config):
     device = ddp_config['device']
     image_size = model_config['img_size']
     in_channels = model_config['in_channels']
+    img_scale_factor = model_config['img_scale_factor']
     # Only set this if you are using a GPU with limited memory
     # torch.cuda.set_per_process_memory_fraction(0.5, device=0)
     
-    model = TransformerVAE(img_size=image_size, patch_size=16, latent_dim=128, in_channels=in_channels).to(device)
+    if model_config['model_type'] == 'CNN':
+        model = CNNVAE(in_channels=in_channels, hidden_channels=64, latent_channels=128, scale=img_scale_factor).to(device)
+    elif model_config['model_type'] == 'Transformer':
+        model = TransformerVAE(img_size=image_size, patch_size=16, latent_dim=128, in_channels=in_channels, img_scale_factor=img_scale_factor).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     model = DDP(model, device_ids=[ddp_config["local_rank"]], output_device=ddp_config["local_rank"]) # DDP Wrapping
     model = torch.compile(model) # Torch Compile Wrapping
