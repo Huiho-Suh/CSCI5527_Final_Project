@@ -371,7 +371,7 @@ def get_config(args):
         'num_heads': 8,
         'num_layers': 6,
         'latent_dim': 128,
-        'patch_size': 8,
+        'patch_size': 4,
         'img_size': (480, 640),
         'in_channels': in_channels,
         'model_type': args['model_type']# 'CNN' or 'Transformer'

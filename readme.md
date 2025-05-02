@@ -41,6 +41,85 @@ torchrun --nproc_per_node=2 train.py \
     --lr 1e-3 \
     --seed 0 
 
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_2_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 2 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0
+
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_2_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 2 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0 --eval
+
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_4_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 4 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0
+
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_4_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 4 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0 --eval
+
+
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_8_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 8 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0
+
+    torchrun --nproc_per_node=2 train.py \
+    --task_name aloha_sim_insertion_human_image \
+    --ckpt_dir ckpt/insertion_sr_8_Transformer \
+    --num_epochs 100  \
+    --model_type Transformer \
+    --batch_size 16 \
+    --img_scale_factor 8 \
+    --embed_dim 768 \
+    --dim_feedforward 2048 \
+    --weight_decay 1e-4 \
+    --lr 1e-3 \
+    --seed 0 --eval
+
 ```
 
 
