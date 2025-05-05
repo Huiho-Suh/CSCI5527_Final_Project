@@ -22,6 +22,7 @@ from utils import frechet_distance, get_beta_cyclical, inception_preprocess, com
 from tqdm import tqdm
 
 from torchvision.models import inception_v3
+import gc
 
 
 def main(args):
@@ -35,8 +36,6 @@ def main(args):
     ckpt_dir = model_config['ckpt_dir']
     
 
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
     os.makedirs(ckpt_dir, exist_ok=True)
     
     ddp_config = set_distributed_training()
@@ -64,7 +63,6 @@ def main(args):
     with open(stats_path, 'wb') as f:
         pickle.dump(norm_stats, f)
     
-    
 def train(model, model_config, optimizer, 
           train_dataloader,
           val_dataloader,
@@ -84,6 +82,7 @@ def train(model, model_config, optimizer,
     train_history = []
     validation_history = []
     
+    # Validating
     if local_rank == 0:
         epoch_iter = tqdm(range(num_epochs), desc="Training")
         
@@ -99,15 +98,19 @@ def train(model, model_config, optimizer,
         
         with torch.inference_mode():
             model.eval()
+            # Cyclical KL Divergence Annealing
+            cycle_length = 500
+            iteration = 0
             for batch in val_dataloader:
+                beta = get_beta_cyclical(iteration, cycle_length, min_beta=0.1, max_beta=1.0)
                 batch = batch.to(device, non_blocking=True)
                 recon_batch, mu, log_var = model(batch)
-                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var)
+                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var, beta)
             
                 total_loss += torch.tensor((bce.detach(), kl.detach(), loss.detach()), device=device)
                 total_count += batch.size(0)
                 
-                del recon_batch, mu, log_var
+                del batch, recon_batch, mu, log_var
                 torch.cuda.empty_cache()
                 
         # Sum up the losses from all GPUs
@@ -155,7 +158,7 @@ def train(model, model_config, optimizer,
              # AMP Autocast
             with autocast(device_type='cuda', enabled=True):
                 recon_batch, mu, log_var = model(batch)
-                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var)
+                bce, kl, loss = model.module.loss_function(batch, recon_batch, mu, log_var, beta)
                 
             # Scaled backward + step
             scaler.scale(loss).backward()
@@ -371,7 +374,7 @@ def get_config(args):
         'num_heads': 8,
         'num_layers': 6,
         'latent_dim': 128,
-        'patch_size': 4,
+        'patch_size': 16,
         'img_size': (480, 640),
         'in_channels': in_channels,
         'model_type': args['model_type']# 'CNN' or 'Transformer'
@@ -385,6 +388,7 @@ def get_config(args):
         'eval': args['eval'],
         'model_config': model_config,
         'num_workers': max(os.cpu_count() - 2 , 1),
+        # 'num_workers': 0,
         'in_channels': in_channels,
     }
     

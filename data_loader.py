@@ -66,13 +66,6 @@ class RobotDataset(Dataset):
             transform: The transform to apply to the dataset.
         """
         
-        # if scaling:
-        #     new_size = (int(self.image_size[0] * torch.sqrt(self.image_scaling_factor)), 
-        #                 int(self.image_size[1] * torch.sqrt(self.image_scaling_factor)))
-        # else:
-        #     new_size = self.image_size
-        
-        
         return v2.Compose([
             # v2.ToImage(), # Convert from PIL to tensor
             v2.ToDtype(torch.float32, scale=True), # float32 in [0, 1]
