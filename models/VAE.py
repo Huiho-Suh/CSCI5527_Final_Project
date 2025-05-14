@@ -108,7 +108,7 @@ class TransformerVAE(nn.Module):
         loss = bce + beta * kl
         
         return bce, kl, loss
-    
+
     def scaled_image_size(self, img_size, img_scale_factor, patch_size):
         # Apply scaling factor
         new_H = img_size[0] // img_scale_factor

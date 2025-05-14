@@ -189,7 +189,8 @@ def plot_history(train_history_dict, val_history_dict, num_epochs, ckpt_dir, see
     
 def save_examples(orig_batch, recon_batch, save_dir):
     
-    random_idx = np.random.randint(0, orig_batch.shape[0])
+    # random_idx = np.random.randint(0, orig_batch.shape[0])
+    random_idx = 0
     os.makedirs(save_dir, exist_ok=True)
     orig_tensor = orig_batch[random_idx]
     recon_tensor = recon_batch[random_idx]
