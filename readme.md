@@ -45,7 +45,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_2_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 2 \
@@ -58,7 +58,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_2_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 2 \
@@ -71,7 +71,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_4_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 4 \
@@ -84,7 +84,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_4_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 4 \
@@ -98,7 +98,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_8_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 8 \
@@ -111,7 +111,7 @@ torchrun --nproc_per_node=1 train.py \
     torchrun --nproc_per_node=2 train.py \
     --task_name aloha_sim_insertion_human_image \
     --ckpt_dir ckpt/insertion_sr_8_Transformer \
-    --num_epochs 100  \
+    --num_epochs 50  \
     --model_type Transformer \
     --batch_size 32 \
     --img_scale_factor 8 \

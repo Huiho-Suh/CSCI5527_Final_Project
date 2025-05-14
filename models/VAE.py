@@ -63,6 +63,7 @@ class TransformerVAE(nn.Module):
         self.BCE = nn.BCEWithLogitsLoss(reduction='sum')
         
     def encode(self, x):
+        x = transforms.Resize(self.new_img_size)(x) # Resize to new image size
         x = self.patch_embedding(x) # (B, num_patches, embed_dim)
         x = self.encoder(x) # (B, num_patches, embed_dim)
         x = x.flatten(1) # (B, num_patches * embed_dim)
