@@ -89,8 +89,6 @@ class TransformerVAE(nn.Module):
         return x
     
     def forward(self, x):
-        # Scale the image
-        x = transforms.Resize(self.new_img_size)(x)
         mu, log_var = self.encode(x)
         z = self.reparameterize(mu, log_var)
         x_recon = self.decode(z)
